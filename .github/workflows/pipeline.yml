@@ -16,5 +16,4 @@ on:
 jobs:
   build-jar:    
     runs-on: ubuntu-latest
-    steps:
-      - uses: premjith19/githubactions/.github/workflows/reusable.yaml@main
+    uses: premjith19/githubactions/.github/workflows/reusable.yaml@main
