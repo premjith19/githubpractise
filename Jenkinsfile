@@ -5,10 +5,9 @@ pipeline {
         appname      = "backend"
         tag          = "v1"
         argocdPassUAT = credentials('argocd-pass-uat')
-        DockerHubUser = credentials('dockerhub-user')
         branch       = "${GIT_BRANCH}"
         DockerRegistryUrl = "nettur19"
-        DOCKER_PASS = "Canada_2797"
+ 
     }
 
     stages {
