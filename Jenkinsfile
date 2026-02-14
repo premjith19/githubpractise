@@ -8,6 +8,7 @@ pipeline {
         DockerHubUser = credentials('dockerhub-user')
         branch       = "${GIT_BRANCH}"
         DockerRegistryUrl = "nettur19"
+        DOCKER_PASS = "Canada_2797"
     }
 
     stages {
@@ -111,23 +112,6 @@ pipeline {
                     }
                 }
             }
-            post {
-                always {
-                    emailext subject: 'Trivy-DigiLedge-MCA-Test-BackEnd-Report',
-                             body: 'Trivy DigiLedge-MCA-Test-BackEnd report.',
-                             attachmentsPattern: '**/trivyreport.html',
-                             to: '$DEFAULT_RECIPIENTS'
-
-                    publishHTML(target: [
-                        allowMissing: true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll: false,
-                        reportDir: '',
-                        reportFiles: 'trivyreport.html',
-                        reportName: "Trivy Image Scan Report"
-                    ])
-                }
-            }
         }
 
         stage('trivy image secrets scan') {
@@ -142,22 +126,6 @@ pipeline {
                     sh "trivy image --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivysecretreport.html ${Docker_registry}:${GitVersion_SemVer} --timeout 30m --no-progress --scanners secret --exit-code 1 --severity HIGH,CRITICAL" //--no-progress --exit-code 1 --severity HIGH,CRITICAL
                 }
             }
-             post {
-                 always {
-            //         emailext subject: 'Trivy-DigiLedge-MCA-Test-BackEnd-Secret-Report',
-            //                  body: 'Trivy DigiLedge-MCA-Test-BackEnd Secret report.',
-            //                  attachmentsPattern: '**/trivysecretreport.html',
-            //                  to: '$DEFAULT_RECIPIENTS'
-                       publishHTML(target: [
-                         allowMissing: true,
-                         alwaysLinkToLastBuild: true,
-                         keepAll: false,
-                         reportDir: '',
-                         reportFiles: 'trivysecretreport.html',
-                         reportName: "Trivy Image Secret Scan Report"
-                     ])
-                 }
-             }
         }
 
         stage('Docker Image Push') {
@@ -176,22 +144,6 @@ pipeline {
                     }
                 }
             }
-            post {
-                failure {
-                    script {
-                        emailext attachLog: true, body: '''$DEFAULT_CONTENT
-    Job Details:
-    Application: ${JOB_NAME}
-    Branch Name: ${BRANCH_NAME}
-    ---------------------------
-    Docker image-build was failed
-    Please check the Dockerfile
-    --------------------------
-    Code changes:
-    ${CHANGES}''', subject: '$DEFAULT_SUBJECT', to: '$DEFAULT_RECIPIENTS'
-                    }
-                }
-            }
         }
 
 
@@ -199,37 +151,7 @@ pipeline {
             when { branch '*release/**' }
             steps {
               sh "yes | argocd login ${ArgoCDUatUrl} --username admin --password ${argocdPassUAT}"
-              sh "argocd app actions run MCA-Test-BackEnd restart --kind Rollout --resource-name ams-server-v1"
-            }
-            post {
-                always {
-                    jiraSendDeploymentInfo site: 'mintoak.atlassian.net',
-                                           environmentId: 'App-cluster',
-                                           environmentName: 'UAT',
-                                           environmentType: 'testing'
-                }
-                success {
-                    script {
-                        emailext attachLog: true, body: '''$DEFAULT_CONTENT
-    Job Details:
-    Application: ${JOB_NAME}
-    Branch Name: ${BRANCH_NAME}
-    Deployment Server: app-cluster
-    ---------------------------
-    SonarQube Report generated (code analysis + code coverage)
-    Sonar Quality Gate is Passed, check URL: ${SONAR_URL}
-
-    Junit Test-Cases:
-    Total tests = $TEST_COUNTS
-    Passed = ${TEST_COUNTS,var="pass"}
-    Failed = ${TEST_COUNTS,var="fail"}
-    Test cases Results:
-    ${FAILED_TESTS}
-    --------------------------
-    Code changes:
-    ${CHANGES}''', subject: '$DEFAULT_SUBJECT', to: '$DEFAULT_RECIPIENTS'
-                    }
-                }
+              sh "argocd app actions run MCA-Test-BackEnd restart --kind Rollout --resource-name backend"
             }
         }
 
