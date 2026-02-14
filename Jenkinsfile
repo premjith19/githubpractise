@@ -25,7 +25,7 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar_server') {
                     sh '''#!/bin/bash
-                        docker run --rm -u 0 -v "$PWD:/usr/src" -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner -Dsonar.projectKey=backend -Dsonar.sources=src/main -Dsonar.java.binaries=target/classes -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=${SONAR_AUTH_TOKEN} -Dsonar.branch.name=${GitVersion_BranchName} -Dsonar.qualitygate.wait=false
+                        docker run --rm -u 0 -v "$PWD:/usr/src" -w /usr/src sonarsource/sonar-scanner-cli:latest sonar-scanner -Dsonar.projectKey=backend -Dsonar.sources=src/main -Dsonar.java.binaries=target/classes -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.login=${SONAR_AUTH_TOKEN} -Dsonar.branch.name=${branch} -Dsonar.qualitygate.wait=false
                     '''
                 }
             }
@@ -71,12 +71,12 @@ pipeline {
                     sh "echo $DOCKER_PASS | docker login --username ${DockerHubUser} --password-stdin ${DockerRegistryUrl}"
                     if ((env.branch).startsWith('release')) {
                         env.Docker_registry = "${DockerRegistryUrl}/${appname}"
-                        sh "docker build -t ${Docker_registry}:${GitVersion_SemVer} ."
-                        sh "docker tag ${Docker_registry}:${GitVersion_SemVer} ${Docker_registry}:uat"
+                        sh "docker build -t ${Docker_registry}:${tag} ."
+                        sh "docker tag ${Docker_registry}:${tag} ${Docker_registry}:uat"
                     } else if (env.branch == 'main') {
 
-                        sh "docker build -t ${Docker_registry}:${GitVersion_SemVer} ."
-                        sh "docker tag ${Docker_registry}:${GitVersion_SemVer} ${Docker_registry}:prod"
+                        sh "docker build -t ${Docker_registry}:${tag} ."
+                        sh "docker tag ${Docker_registry}:${tag} ${Docker_registry}:prod"
                     }
                 }
             }
@@ -91,7 +91,7 @@ pipeline {
             }
             steps {
                 script {
-                    sh "trivy image --format spdx-json -o result.json ${Docker_registry}:${GitVersion_SemVer}"
+                    sh "trivy image --format spdx-json -o result.json ${Docker_registry}:${tag}"
                 }
             }
         }
@@ -105,9 +105,9 @@ pipeline {
             }
             steps {
                 script {
-                    sh "trivy image --timeout 20m --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivyreport.html ${Docker_registry}:${GitVersion_SemVer} --timeout 25m "
+                    sh "trivy image --timeout 20m --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivyreport.html ${Docker_registry}:${tag} --timeout 25m "
                     if (env.TrivyGateEnabled == "True") {
-                        sh "trivy image --no-progress --exit-code 1 --severity HIGH,CRITICAL ${Docker_registry}:${GitVersion_SemVer}"
+                        sh "trivy image --no-progress --exit-code 1 --severity HIGH,CRITICAL ${Docker_registry}:${tag}"
                     }
                 }
             }
@@ -122,7 +122,7 @@ pipeline {
             }
             steps {
                 script {
-                    sh "trivy image --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivysecretreport.html ${Docker_registry}:${GitVersion_SemVer} --timeout 30m --no-progress --scanners secret --exit-code 1 --severity HIGH,CRITICAL" //--no-progress --exit-code 1 --severity HIGH,CRITICAL
+                    sh "trivy image --format template --template \"@/usr/local/share/trivy/templates/html.tpl\" -o trivysecretreport.html ${Docker_registry}:${tag} --timeout 30m --no-progress --scanners secret --exit-code 1 --severity HIGH,CRITICAL" //--no-progress --exit-code 1 --severity HIGH,CRITICAL
                 }
             }
         }
@@ -131,8 +131,8 @@ pipeline {
             steps {
                 script {
                     sh "echo $DOCKER_PASS | docker login --username AWS --password-stdin ${DockerRegistryUrl}"
-                    sh "docker push ${Docker_registry}:${GitVersion_SemVer} || true"
-                    sh "docker rmi -f ${Docker_registry}:${GitVersion_SemVer}"
+                    sh "docker push ${Docker_registry}:${tag} || true"
+                    sh "docker rmi -f ${Docker_registry}:${tag}"
 
                     if ((env.branch).startsWith('release')) {
                         sh "docker push ${Docker_registry}:uat || true"
